@@ -1,0 +1,26 @@
+schema_version = "1.0"
+
+[[artifact]]
+id = "ATLASCTL-PROP-0001"
+kind = "proposal"
+path = "docs/proposals/ATLASCTL-PROP-0001-source-of-truth-contract-stack.md"
+status = "proposed"
+owner = "repo-infra"
+milestone = "0.1.0"
+
+[[artifact]]
+id = "ATLASCTL-SPEC-0001"
+kind = "spec"
+path = "docs/specs/ATLASCTL-SPEC-0001-source-of-truth-stack.md"
+status = "accepted"
+owner = "repo-infra"
+linked_proposal = "ATLASCTL-PROP-0001"
+
+[[artifact]]
+id = "ATLASCTL-PLAN-0001"
+kind = "plan"
+path = "plans/0.1.0/implementation-plan.md"
+status = "active"
+owner = "repo-infra"
+linked_proposal = "ATLASCTL-PROP-0001"
+linked_spec = "ATLASCTL-SPEC-0001"

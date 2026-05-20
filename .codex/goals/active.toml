@@ -1,0 +1,34 @@
+schema_version = "1.0"
+
+id = "atlasctl-0-1-source-of-truth"
+title = "Atlasctl source-of-truth scaffolding"
+status = "active"
+owner = "codex"
+created = "2026-05-20"
+
+objective = """
+Stand up linked source-of-truth artifacts covering roadmap direction,
+proposal/spec linkage, plan sequencing, active goals, support tiers, and policy ledgers.
+"""
+
+end_state = [
+  "Docs, policy, plans, and goal manifest scaffolding exist.",
+  "Document artifacts are registered in policy/doc-artifacts.toml.",
+  "Support-tier claims map to proof commands.",
+]
+
+[[work_item]]
+id = "source-of-truth-scaffold"
+status = "done"
+proposal = "ATLASCTL-PROP-0001"
+spec = "ATLASCTL-SPEC-0001"
+plan = "plans/0.1.0/implementation-plan.md"
+commands = ["git diff --check"]
+
+[[work_item]]
+id = "doc-artifact-ledger"
+status = "ready"
+proposal = "ATLASCTL-PROP-0001"
+spec = "ATLASCTL-SPEC-0001"
+plan = "plans/0.1.0/implementation-plan.md"
+commands = ["cargo xtask check-doc-artifacts", "git diff --check"]

@@ -1,0 +1,7 @@
+name: Policy exception
+about: Record policy exception request
+body:
+  - type: textarea
+    id: policy_area
+    attributes:
+      label: Policy area

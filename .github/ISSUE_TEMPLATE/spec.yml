@@ -1,0 +1,7 @@
+name: Spec
+about: Create or update a behavior spec
+body:
+  - type: textarea
+    id: linked_proposal
+    attributes:
+      label: Linked proposal
