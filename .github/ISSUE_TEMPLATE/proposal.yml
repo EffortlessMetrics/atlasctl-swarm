@@ -1,0 +1,8 @@
+name: Proposal
+about: Create a proposal artifact
+body:
+  - type: textarea
+    id: linked_context
+    attributes:
+      label: Linked context
+      description: Related roadmap/spec/plan links.

@@ -1,0 +1,3 @@
+schema_version = "1.0"
+
+# Workspace package ledger to be populated as crates are added.
