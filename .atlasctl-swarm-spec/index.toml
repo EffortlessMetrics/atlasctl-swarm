@@ -1,0 +1,46 @@
+schema_version = "1.0"
+
+repo = "atlasctl-swarm"
+namespace = ".atlasctl-swarm-spec"
+
+[conventions]
+proposal_prefix = "ATLAS-PROP"
+spec_prefix = "ATLAS-SPEC"
+adr_prefix = "ATLAS-ADR"
+lane_prefix = "ATLAS-LANE"
+
+[external_namespaces]
+codex = ".codex"
+speckit = ".spec"
+claude = ".claude"
+jules = ".jules"
+
+[[artifact]]
+id = "ATLAS-PROP-0001"
+kind = "proposal"
+path = ".atlasctl-swarm-spec/proposals/ATLAS-PROP-0001-repo-native-spec-knowledge-base.md"
+status = "accepted"
+owner = "spec-system"
+
+[[artifact]]
+id = "ATLAS-SPEC-0001"
+kind = "spec"
+path = ".atlasctl-swarm-spec/specs/ATLAS-SPEC-0001-repo-native-spec-rails.md"
+status = "accepted"
+owner = "spec-system"
+linked_proposal = "ATLAS-PROP-0001"
+
+[[artifact]]
+id = "ATLAS-ADR-0001"
+kind = "adr"
+path = ".atlasctl-swarm-spec/adr/ATLAS-ADR-0001-repo-owned-spec-namespace.md"
+status = "accepted"
+owner = "spec-system"
+linked_specs = ["ATLAS-SPEC-0001"]
+
+[[lane]]
+id = "spec-system"
+name = "Spec system implementation"
+path = ".atlasctl-swarm-spec/lanes/spec-system/tracker.toml"
+status = "active"
+owner = "repo-architecture"

@@ -1,0 +1,33 @@
+schema_version = "1.0"
+
+id = "spec-system"
+name = "Spec system implementation"
+status = "active"
+owner = "repo-architecture"
+
+objective = """
+Install a repo-native durable spec control plane under .atlasctl-swarm-spec,
+with clear separation from agent/tool state.
+"""
+
+end_state = [
+  "Durable proposal/spec/ADR/lane/closeout rails live in .atlasctl-swarm-spec.",
+  "Docs explain usage and contributor expectations.",
+  "External agent namespaces are awareness-only.",
+]
+
+[[work_item]]
+id = "namespace-doctrine"
+status = "done"
+proposal = "ATLAS-PROP-0001"
+spec = "ATLAS-SPEC-0001"
+proof = ["git diff --check"]
+
+[[work_item]]
+id = "seed-templates"
+status = "ready"
+proposal = "ATLAS-PROP-0001"
+spec = "ATLAS-SPEC-0001"
+blocks = []
+blocked_by = []
+proof = ["git diff --check"]
