@@ -1,0 +1,4 @@
+schema_version = "1.0"
+
+# Map product claims to proof commands or references.
+# Add claim records as adoption grows.
