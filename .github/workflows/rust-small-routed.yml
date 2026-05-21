@@ -1,0 +1,229 @@
+name: Atlasctl Rust Small Routed
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy-guardrails:
+    name: Policy Guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify routed workflow contract
+        run: .github/scripts/verify-swarm-routing.sh .github/workflows/rust-small-routed.yml
+
+  route-rust-small:
+    name: Route Rust Small
+    runs-on: ubuntu-latest
+    outputs:
+      router_target: ${{ steps.route.outputs.target }}
+      router_reason: ${{ steps.route.outputs.reason }}
+      router_error: ${{ steps.route.outputs.error }}
+    steps:
+      - id: route
+        env:
+          GH_TOKEN: ${{ secrets.EM_RUNNER_READ_TOKEN }}
+          ORG: EffortlessMetrics
+          IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${IS_FORK}" == "true" ]]; then
+            echo "target=github" >> "$GITHUB_OUTPUT"
+            echo "reason=fork_pr" >> "$GITHUB_OUTPUT"
+            echo "error=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "target=github" >> "$GITHUB_OUTPUT"
+            echo "reason=runner_token_missing" >> "$GITHUB_OUTPUT"
+            echo "error=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+          api_out=$(gh api "orgs/${ORG}/actions/runners?per_page=100" 2>&1)
+          api_code=$?
+          set -e
+
+          if [[ $api_code -ne 0 ]]; then
+            reason="runner_api_failed"
+            if echo "$api_out" | grep -qi '401'; then reason="runner_token_unauthorized"; fi
+            if echo "$api_out" | grep -qi '403'; then reason="runner_token_forbidden"; fi
+            echo "target=github" >> "$GITHUB_OUTPUT"
+            echo "reason=${reason}" >> "$GITHUB_OUTPUT"
+            echo "error=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          pick_runner() {
+            local name="$1"
+            echo "$api_out" | jq -e --arg n "$name" '
+              any(.runners[]?; .status == "online" and .busy == false and any(.labels[]?; .name == "em-ci") and any(.labels[]?; .name == $n))
+            ' >/dev/null
+          }
+
+          if pick_runner cpx42; then
+            echo "target=cpx42" >> "$GITHUB_OUTPUT"
+            echo "reason=cpx42_idle" >> "$GITHUB_OUTPUT"
+            echo "error=false" >> "$GITHUB_OUTPUT"
+          elif pick_runner cx43; then
+            echo "target=cx43" >> "$GITHUB_OUTPUT"
+            echo "reason=cx43_idle" >> "$GITHUB_OUTPUT"
+            echo "error=false" >> "$GITHUB_OUTPUT"
+          elif pick_runner cx53; then
+            echo "target=cx53" >> "$GITHUB_OUTPUT"
+            echo "reason=cx53_idle" >> "$GITHUB_OUTPUT"
+            echo "error=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "target=github" >> "$GITHUB_OUTPUT"
+            echo "reason=no_idle_runner" >> "$GITHUB_OUTPUT"
+            echo "error=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  rust-small-on-cpx42:
+    name: Rust Small on CPX42
+    needs: [policy-guardrails, route-rust-small]
+    if: needs.route-rust-small.outputs.router_target == 'cpx42'
+    runs-on:
+      group: em-ci-small
+      labels: [self-hosted, linux, x64, em-ci, cpx42, rust-16gb, rust-medium, trusted-pr]
+    env:
+      CARGO_BUILD_JOBS: "7"
+      CARGO_INCREMENTAL: "0"
+      TMPDIR: /mnt/ci-scratch/tmp/${{ github.run_id }}-${{ github.run_attempt }}
+      CARGO_TARGET_DIR: /mnt/ci-scratch/atlasctl/${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Prepare CPX42 scratch
+        run: |
+          set -euo pipefail
+          ci-disk-guard /mnt/ci-scratch 45
+          ci-disk-guard /mnt/ci-cache 10
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.95.0
+          components: rustfmt, clippy
+      - name: Preflight disk and toolchain
+        run: |
+          set -euo pipefail
+          df -h /mnt/ci-scratch /mnt/ci-cache || true
+          rustc --version
+          cargo --version
+      - name: Run Rust small gate
+        run: |
+          set -euo pipefail
+          if [[ -f Cargo.toml ]]; then
+            cargo check --workspace --locked
+            cargo test --workspace --locked
+          else
+            echo "No Cargo.toml present; skipping Rust gate."
+          fi
+      - name: Cleanup and final stats
+        if: always()
+        run: |
+          set +e
+          rm -rf "$TMPDIR" "$CARGO_TARGET_DIR"
+          df -h /mnt/ci-scratch /mnt/ci-cache || true
+
+  rust-small-on-cx43:
+    name: Rust Small on CX43
+    needs: [policy-guardrails, route-rust-small]
+    if: needs.route-rust-small.outputs.router_target == 'cx43'
+    runs-on:
+      group: em-ci-small
+      labels: [self-hosted, linux, x64, em-ci, cx43, rust-small, trusted-pr]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run via em-ci-rust:1.95
+        run: |
+          set -euo pipefail
+          docker image inspect em-ci-rust:1.95 >/dev/null
+          docker run --rm -v "$PWD:/work" -w /work em-ci-rust:1.95 bash -lc '
+            if [[ -f Cargo.toml ]]; then
+              cargo check --workspace --locked
+              cargo test --workspace --locked
+            else
+              echo "No Cargo.toml present; skipping Rust gate."
+            fi
+          '
+
+  rust-small-on-cx53:
+    name: Rust Small on CX53
+    needs: [policy-guardrails, route-rust-small]
+    if: needs.route-rust-small.outputs.router_target == 'cx53'
+    runs-on:
+      group: em-ci-small
+      labels: [self-hosted, linux, x64, em-ci, cx53, rust-small, trusted-pr]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run via em-ci-rust:1.95
+        run: |
+          set -euo pipefail
+          docker image inspect em-ci-rust:1.95 >/dev/null
+          docker run --rm -v "$PWD:/work" -w /work em-ci-rust:1.95 bash -lc '
+            if [[ -f Cargo.toml ]]; then
+              cargo check --workspace --locked
+              cargo test --workspace --locked
+            else
+              echo "No Cargo.toml present; skipping Rust gate."
+            fi
+          '
+
+  rust-small-on-github-hosted:
+    name: Rust Small on GitHub Hosted
+    needs: [policy-guardrails, route-rust-small]
+    if: needs.route-rust-small.outputs.router_target == 'github'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.95.0
+      - name: Run Rust small gate
+        run: |
+          set -euo pipefail
+          if [[ -f Cargo.toml ]]; then
+            cargo check --workspace --locked
+            cargo test --workspace --locked
+          else
+            echo "No Cargo.toml present; skipping Rust gate."
+          fi
+
+  atlasctl-rust-small-result:
+    name: Atlasctl Rust Small Result
+    runs-on: ubuntu-latest
+    needs:
+      - route-rust-small
+      - rust-small-on-cpx42
+      - rust-small-on-cx43
+      - rust-small-on-cx53
+      - rust-small-on-github-hosted
+    if: always()
+    steps:
+      - name: Validate selected lane result
+        env:
+          TARGET: ${{ needs.route-rust-small.outputs.router_target }}
+          CPX42: ${{ needs.rust-small-on-cpx42.result }}
+          CX43: ${{ needs.rust-small-on-cx43.result }}
+          CX53: ${{ needs.rust-small-on-cx53.result }}
+          GH: ${{ needs.rust-small-on-github-hosted.result }}
+        run: |
+          set -euo pipefail
+          echo "router_target=${TARGET}"
+          case "$TARGET" in
+            cpx42) [[ "$CPX42" == "success" ]] ;;
+            cx43) [[ "$CX43" == "success" ]] ;;
+            cx53) [[ "$CX53" == "success" ]] ;;
+            github) [[ "$GH" == "success" ]] ;;
+            *) echo "Unknown target: $TARGET"; exit 1 ;;
+          esac
