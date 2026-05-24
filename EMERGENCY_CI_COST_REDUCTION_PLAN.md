@@ -3,6 +3,11 @@
 ## Objective
 Immediately reduce GitHub-hosted Actions spend by making default PR CI intentionally minimal and forcing all expensive lanes behind explicit opt-in controls.
 
+## Critical Clarification
+- Self-hosted runners **still execute through GitHub Actions workflows**.
+- You cannot disable GitHub Actions and keep self-hosted CI alive.
+- Cost control is achieved by changing job runner labels from GitHub-hosted labels (`ubuntu-latest`, `windows-latest`, `macos-latest`) to self-hosted labels, not by disabling Actions.
+
 ## Default PR Policy (Emergency)
 - Run **exactly one** lightweight PR lane by default.
 - Prefer self-hosted routed runners (`cpx42`, `cx43`, `cx53`) for Rust small checks.
@@ -49,6 +54,7 @@ Audit all workflow files across repos and flag:
 
 ### Phase 1: PR Slimming
 - Keep one routed `rust-small` PR path per Rust repo.
+- For swarm repos, set all CI jobs to self-hosted (`runs-on: self-hosted` or org-specific self-hosted labels) and remove GitHub-hosted redundancy.
 - Gate or remove broad PR CI from legacy `ci.yml`.
 - Start with highest-cost repos (shipper, shiplog), then hardware-heavy repos (BitNet-rs), then small tools.
 
