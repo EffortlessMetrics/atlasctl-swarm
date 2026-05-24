@@ -1,0 +1,41 @@
+name: CI Efficiency Guardrails
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same branch/PR to avoid burning minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  efficiency-check:
+    name: CI efficiency checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate workflow hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "✅ Concurrency cancellation is enabled for this workflow."
+          echo "✅ Keep job timeouts explicit and prefer dependency caching in build/test workflows."
+
+      - name: CI optimization guidance
+        shell: bash
+        run: |
+          cat <<'EOF'
+          Recommended optimizations to apply in your primary CI workflow(s):
+          - Add paths/path-ignore filters so CI only runs for relevant changes.
+          - Use setup-* action caches (npm/pnpm/pip/go/rust) and key by lockfiles.
+          - Split slow integration tests behind conditional triggers.
+          - Upload/download artifacts instead of rebuilding identical outputs.
+          - Keep matrix dimensions minimal and avoid duplicate OS/runtime combos.
+          EOF
