@@ -1,0 +1,286 @@
+name: Atlasctl Rust Small
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      runner_target:
+        description: "Runner target override for smoke testing"
+        required: false
+        default: auto
+        type: choice
+        options:
+          - auto
+          - cx43
+          - cpx42
+          - cx53
+          - github
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  workflow-policy:
+    name: Workflow policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ban bare self-hosted routing
+        run: .github/scripts/check-no-bare-self-hosted.sh
+
+      - name: Parse edited workflow YAML
+        run: |
+          ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].sort.each { |f| YAML.load_file(f); puts "parsed #{f}" }'
+
+  route-rust-small:
+    name: Route Atlasctl Rust Small
+    needs: workflow-policy
+    runs-on: ubuntu-latest
+    outputs:
+      target: ${{ steps.route.outputs.target }}
+      reason: ${{ steps.route.outputs.reason }}
+      same_repo_pr: ${{ steps.trust.outputs.same_repo_pr }}
+    env:
+      GH_TOKEN: ${{ secrets.EM_RUNNER_READ_TOKEN }}
+      REQUESTED_TARGET: ${{ inputs.runner_target || 'auto' }}
+      SAME_REPO_PR: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - name: Determine PR trust
+        id: trust
+        run: |
+          echo "same_repo_pr=${SAME_REPO_PR}" >> "$GITHUB_OUTPUT"
+
+      - name: Select runner target
+        id: route
+        run: |
+          set -euo pipefail
+
+          if [ "${SAME_REPO_PR}" != "true" ]; then
+            echo "target=github" >> "$GITHUB_OUTPUT"
+            echo "reason=fork_pr_uses_github_hosted_fallback" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          case "${REQUESTED_TARGET}" in
+            cx43|cpx42|cx53|github)
+              echo "target=${REQUESTED_TARGET}" >> "$GITHUB_OUTPUT"
+              echo "reason=manual_${REQUESTED_TARGET}_override" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+            auto|'') ;;
+            *)
+              echo "Unsupported runner_target: ${REQUESTED_TARGET}" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "EM_RUNNER_READ_TOKEN is required for same-repo runner discovery" >&2
+            exit 1
+          fi
+
+          runners="$(gh api "orgs/EffortlessMetrics/actions/runners?per_page=100")"
+
+          pick() {
+            local label="$1"
+            jq -e --arg label "$label" '
+              any(.runners[]?;
+                .status == "online" and
+                (.busy | not) and
+                any(.labels[]?; .name == "em-ci") and
+                any(.labels[]?; .name == "rust-medium" or .name == "rust-large") and
+                any(.labels[]?; .name == $label)
+              )
+            ' <<<"$runners" >/dev/null
+          }
+
+          for target in cx43 cpx42 cx53; do
+            if pick "$target"; then
+              echo "target=${target}" >> "$GITHUB_OUTPUT"
+              echo "reason=${target}_idle" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "target=github" >> "$GITHUB_OUTPUT"
+          echo "reason=no_idle_em_ci_small_runner" >> "$GITHUB_OUTPUT"
+
+      - name: Route summary
+        run: |
+          cat <<SUMMARY
+          target=${{ steps.route.outputs.target }}
+          reason=${{ steps.route.outputs.reason }}
+          same_repo_pr=${{ steps.trust.outputs.same_repo_pr }}
+          SUMMARY
+
+  rust-small-cx43:
+    name: Rust Small on CX43
+    needs: route-rust-small
+    if: >-
+      ${{
+        needs.route-rust-small.outputs.target == 'cx43' &&
+        needs.route-rust-small.outputs.same_repo_pr == 'true'
+      }}
+    runs-on:
+      group: em-ci-small
+      labels:
+        - self-hosted
+        - linux
+        - x64
+        - em-ci
+        - cx43
+        - rust-medium
+        - trusted-pr
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Rust small checks
+        uses: ./.github/actions/rust-small-checks
+
+  rust-small-cpx42:
+    name: Rust Small on CPX42
+    needs: route-rust-small
+    if: >-
+      ${{
+        needs.route-rust-small.outputs.target == 'cpx42' &&
+        needs.route-rust-small.outputs.same_repo_pr == 'true'
+      }}
+    runs-on:
+      group: em-ci-small
+      labels:
+        - self-hosted
+        - linux
+        - x64
+        - em-ci
+        - cpx42
+        - rust-medium
+        - rust-16gb
+        - trusted-pr
+    env:
+      CARGO_HOME: /mnt/ci-scratch/cargo-home
+      SCCACHE_DIR: /mnt/ci-scratch/sccache
+      CARGO_BUILD_JOBS: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.95.0
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: 1.95.0
+      - name: Prepare CPX42 scratch paths
+        run: |
+          set -euo pipefail
+          export TMPDIR="/mnt/ci-scratch/tmp/${GITHUB_RUN_ID}-${GITHUB_JOB}"
+          export CARGO_TARGET_DIR="/mnt/ci-scratch/target/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}-${GITHUB_JOB}"
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR" "$CARGO_HOME" "$SCCACHE_DIR"
+          {
+            echo "TMPDIR=$TMPDIR"
+            echo "CARGO_TARGET_DIR=$CARGO_TARGET_DIR"
+          } >> "$GITHUB_ENV"
+      - name: Print pre-check resource stats
+        run: |
+          df -h /mnt/ci-scratch . || true
+          free -h || true
+          du -sh "$CARGO_HOME" "$SCCACHE_DIR" 2>/dev/null || true
+      - name: Run Rust small checks
+        uses: ./.github/actions/rust-small-checks
+      - name: Print post-check resource stats
+        if: always()
+        run: |
+          df -h /mnt/ci-scratch . || true
+          free -h || true
+          du -sh "$CARGO_HOME" "$SCCACHE_DIR" 2>/dev/null || true
+      - name: Clean CPX42 scratch paths
+        if: always()
+        run: |
+          rm -rf "${TMPDIR:-}" "${CARGO_TARGET_DIR:-}"
+
+  rust-small-cx53:
+    name: Rust Small on CX53
+    needs: route-rust-small
+    if: >-
+      ${{
+        needs.route-rust-small.outputs.target == 'cx53' &&
+        needs.route-rust-small.outputs.same_repo_pr == 'true'
+      }}
+    runs-on:
+      group: em-ci-small
+      labels:
+        - self-hosted
+        - linux
+        - x64
+        - em-ci
+        - cx53
+        - rust-large
+        - trusted-pr
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Rust small checks
+        uses: ./.github/actions/rust-small-checks
+
+  rust-small-github:
+    name: Rust Small on GitHub Hosted
+    needs: route-rust-small
+    if: ${{ needs.route-rust-small.outputs.target == 'github' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Rust small checks
+        uses: ./.github/actions/rust-small-checks
+
+  atlasctl-rust-small-result:
+    name: Atlasctl Rust Small Result
+    needs:
+      - route-rust-small
+      - rust-small-cx43
+      - rust-small-cpx42
+      - rust-small-cx53
+      - rust-small-github
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate selected implementation result
+        run: |
+          set -euo pipefail
+          target='${{ needs.route-rust-small.outputs.target }}'
+          route_result='${{ needs.route-rust-small.result }}'
+          cx43='${{ needs.rust-small-cx43.result }}'
+          cpx42='${{ needs.rust-small-cpx42.result }}'
+          cx53='${{ needs.rust-small-cx53.result }}'
+          github='${{ needs.rust-small-github.result }}'
+
+          echo "route=${route_result} target=${target}"
+          echo "cx43=${cx43} cpx42=${cpx42} cx53=${cx53} github=${github}"
+
+          if [ "${route_result}" != "success" ]; then
+            echo "Router did not succeed" >&2
+            exit 1
+          fi
+
+          case "${target}" in
+            cx43) selected="${cx43}" ;;
+            cpx42) selected="${cpx42}" ;;
+            cx53) selected="${cx53}" ;;
+            github) selected="${github}" ;;
+            *)
+              echo "Unknown target: ${target}" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ "${selected}" != "success" ]; then
+            echo "Selected implementation did not succeed: ${selected}" >&2
+            exit 1
+          fi
+
+          echo "Atlasctl Rust Small Result passed for target ${target}."
