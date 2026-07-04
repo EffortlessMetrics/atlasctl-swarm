@@ -84,3 +84,93 @@ After the emergency cost controls are in place, use [`RUST_TOOLING_CONTROL_PLANE
 - No duplicate default PR execution of routed + legacy broad CI.
 - No silent GitHub-hosted fallback.
 - Default PR path constrained to preferred/hard LEM thresholds.
+
+## Hard Compatibility Invariants (Codex CI-Efficiency Brief Addendum)
+
+> Do not optimize CI by blindly canceling active work or by routing metadata edits through Rust.
+> Optimize by classifying changes correctly, keeping one active run, one pending replacement slot, and making default PR paths tiny.
+
+### 1) Concurrency semantics (heavy/core workflows)
+- For heavy/core PR workflows, do **not** use `cancel-in-progress: true`.
+- Required semantics are **single active run + single pending replacement slot**:
+  - if one run is already executing, let it continue;
+  - if a newer commit arrives, queue the newer run;
+  - if another newer commit arrives while one is pending, replace the older pending run;
+  - when active run finishes, run the latest pending one.
+- Canonical pattern:
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+```
+
+- Do not submit “efficiency” PRs that cancel active Rust/core CI runs unless repo policy explicitly marks that workflow safe to cancel.
+
+### 2) Change classification (metadata/control-plane must stay light)
+- Do not treat all changed files as Rust-code changes.
+- Metadata/control-plane changes must route to docs/policy/light CI paths.
+- Changes that should remain light (unless mixed with real Rust/build/test edits):
+  - `docs/**`
+  - `*.md`
+  - `README*`, `CHANGELOG*`, `SECURITY*`, `CONTRIBUTING*`
+  - `policy/**`
+  - `plans/**`
+  - `badges/**`
+  - `AGENTS.md`
+  - `.github/CODEOWNERS`
+  - `.github/dependabot.yml`
+  - `.github/pull_request_template.md`
+  - `.github/PULL_REQUEST_TEMPLATE/**`
+  - `.codex/campaigns/**`
+  - `docs/tracking/**`
+  - `ci/hardware/**` receipt files
+  - `.rails/**`
+  - `.uselesskey/**`
+- Workflow-file edits remain special:
+  - `.github/workflows/**` must not route through docs-light;
+  - route to minimal hosted workflow-validation/safety path, not full Rust CI unless required.
+
+### 3) Default PR routing policy
+- Classify first, then choose the cheapest truthful lane.
+- `docs/control-plane-only` -> no Rust compile.
+- `workflow-only` -> hosted YAML/workflow validation, no full Rust.
+- `Rust source/build/test touched` -> routed `rust-small`.
+- `hardware/GPU/receipt-only` -> syntax/receipt validation only.
+- `unknown or mixed changes` -> `rust-small`, not full CI.
+- Full CI requires explicit gate (label, manual dispatch, main push, release, schedule, or merge queue).
+
+### 4) Hosted fallback policy
+- Do not silently turn self-hosted `rust-small` into full GitHub-hosted Rust lanes.
+- Fork PRs may use tiny hosted safe lane only.
+- Runner readiness/token/idle-capacity failures must not trigger 75–120 minute hosted equivalents.
+- Require explicit labels/inputs for expensive hosted fallback:
+  - `full-ci`
+  - `allow-github-hosted`
+  - `ci-budget-ack`
+
+### 5) Artifacts policy
+- Do not always upload receipts/JUnit/log artifacts on default PR CI unless tiny and required by merge policy.
+- Prefer upload-on-failure with 3–7 day retention.
+- If receipts are required for policy, keep them small and avoid docs/control-plane upload paths.
+
+### 6) Required testing for CI-only efficiency PRs
+Every CI-efficiency PR must include:
+- `git diff --check`
+- YAML parse check for edited workflows
+- classification dry-run/shell-unit tests covering:
+  - docs-only
+  - `.rails/**`
+  - `.uselesskey/**`
+  - workflow-file change
+  - Rust-file change
+  - mixed docs + Rust
+- confirmation that concurrency did not regress from no-cancel semantics unless intentionally documented.
+
+### Reviewer rejection checklist (must-answer)
+Reject CI-efficiency PRs unless they explicitly answer all of:
+1. Does this preserve `cancel-in-progress: false` for heavy/core CI?
+2. Does this avoid Rust CI for metadata/control-plane-only edits?
+3. Does this keep workflow changes out of docs-light?
+4. Does this avoid silent expensive hosted fallback?
+5. Does this reduce actual billable work (not just move it)?
