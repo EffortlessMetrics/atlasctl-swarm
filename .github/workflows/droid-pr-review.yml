@@ -1,17 +1,22 @@
 name: Droid PR Review
 
 on:
+  workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [labeled]
 
 concurrency:
-  group: droid-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: droid-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   droid-review:
-    if: github.event.pull_request.draft == false
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' &&
+       (github.event.label.name == 'ai-review' || github.event.label.name == 'full-ci'))
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     permissions:
       contents: read
@@ -27,25 +32,26 @@ jobs:
 
       - name: Configure MiniMax M3 for Droid BYOK
         shell: bash
+        env:
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
         run: |
           mkdir -p "$HOME/.factory"
 
-          cat > "$HOME/.factory/settings.json" <<'JSON'
-          {
-            "customModels": [
+          jq -n --arg key "$MINIMAX_API_KEY" '{
+            customModels: [
               {
-                "model": "MiniMax-M3",
-                "displayName": "MiniMax-M3",
-                "baseUrl": "https://api.minimax.io/anthropic",
-                "apiKey": "${MINIMAX_API_KEY}",
-                "provider": "anthropic",
-                "maxOutputTokens": 64000
+                model: "MiniMax-M3",
+                displayName: "MiniMax-M3",
+                baseUrl: "https://api.minimax.io/anthropic",
+                apiKey: $key,
+                provider: "anthropic",
+                maxOutputTokens: 64000
               }
             ]
-          }
-          JSON
+          }' > "$HOME/.factory/settings.json"
 
       - name: Run Droid Auto Review
+        # TODO: pin to a release SHA once one is vetted (mutable @main is a supply-chain risk)
         uses: Factory-AI/droid-action@main
         env:
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
