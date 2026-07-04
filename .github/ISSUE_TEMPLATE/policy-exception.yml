@@ -1,0 +1,9 @@
+name: Policy exception
+description: Record a policy exception request against a ledger in .rails/policy/
+labels: ["policy-exception"]
+body:
+  - type: textarea
+    id: policy_area
+    attributes:
+      label: Policy area
+      description: Which ledger under .rails/policy/ this exception targets (see .rails/policy/ledgers.toml).

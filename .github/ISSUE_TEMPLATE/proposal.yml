@@ -1,0 +1,9 @@
+name: Proposal
+description: Create a proposal artifact (ATLAS-PROP-*) under .rails/proposals/
+labels: ["proposal"]
+body:
+  - type: textarea
+    id: linked_context
+    attributes:
+      label: Linked context
+      description: Related spec/lane/artifact links from .rails/index.toml.
