@@ -1,0 +1,9 @@
+name: Spec
+description: Create or update a behavior spec (ATLAS-SPEC-*) under .rails/specs/
+labels: ["spec"]
+body:
+  - type: textarea
+    id: linked_proposal
+    attributes:
+      label: Linked proposal
+      description: ATLAS-PROP-* ID and path under .rails/proposals/.

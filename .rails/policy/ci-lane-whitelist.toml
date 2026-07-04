@@ -1,0 +1,32 @@
+schema_version = "1.0"
+
+# Whitelisted CI lanes. Any lane not listed here must not run on PRs.
+# Governed by EMERGENCY_CI_COST_REDUCTION_PLAN.md: default PR CI is exactly
+# one routed self-hosted lane; everything else is explicit opt-in.
+
+[[lane]]
+id = "atlasctl-rust-small"
+owner = "repo-infra"
+workflow = ".github/workflows/atlasctl-rust-small.yml"
+intent = "Default PR lane: routed self-hosted Rust small checks (format/lint, cargo check, focused cargo test, git diff --check)"
+proof_obligation = "Pass routed rust-small checks within LEM budget"
+runner_policy = "self-hosted routed; hosted fallback only via allow-github-hosted / ci-budget-ack / full-ci labels or maintainer dispatch"
+cost_estimate = "low"
+budget_lem_preferred = 25
+budget_lem_hard = 35
+trigger_policy = "pull_request"
+concurrency = "single active run + single pending replacement slot; cancel-in-progress must stay false"
+status = "default"
+review_after = "2026-10-01"
+
+[[lane]]
+id = "droid-pr-review"
+owner = "repo-infra"
+workflow = ".github/workflows/droid-pr-review.yml"
+intent = "Opt-in AI PR review lane"
+proof_obligation = "Produce review feedback only when explicitly requested"
+runner_policy = "runs only when explicitly gated; never on unlabeled PRs"
+cost_estimate = "medium"
+trigger_policy = "label:ai-review,label:full-ci,workflow_dispatch"
+status = "opt-in"
+review_after = "2026-10-01"

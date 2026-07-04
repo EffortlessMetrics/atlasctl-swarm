@@ -1,0 +1,37 @@
+name: Implementation slice
+description: PR-sized execution slice tracked in a .rails/lanes/<lane>/tracker.toml work item
+labels: ["implementation-slice"]
+body:
+  - type: input
+    id: proposal
+    attributes:
+      label: Linked proposal
+      description: ATLAS-PROP-* ID.
+  - type: input
+    id: spec
+    attributes:
+      label: Linked spec
+      description: ATLAS-SPEC-* ID.
+  - type: input
+    id: lane_work_item
+    attributes:
+      label: Lane work item
+      description: Work item ID in .rails/lanes/<lane>/tracker.toml.
+  - type: textarea
+    id: expected_files
+    attributes:
+      label: Expected files
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals
+  - type: textarea
+    id: proof_commands
+    attributes:
+      label: Proof commands
+      description: Commands listed in the lane implementation plan / work item proof list.
+  - type: textarea
+    id: claim_boundary
+    attributes:
+      label: Claim boundary
+      description: What this slice does not prove (see .rails/support/claim-map.toml).

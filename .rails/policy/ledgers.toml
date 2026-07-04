@@ -2,3 +2,51 @@ schema_version = "1.0"
 
 # Reference live policy ledgers here.
 # Keep this file as references only; do not duplicate governed ledger content.
+
+[[ledger]]
+id = "ci-lane-whitelist"
+name = "CI lane whitelist"
+status = "active"
+owner = "repo-infra"
+ledger_path = ".rails/policy/ci-lane-whitelist.toml"
+notes = "Whitelisted CI lanes; governed by EMERGENCY_CI_COST_REDUCTION_PLAN.md."
+
+[[ledger]]
+id = "package-boundary"
+name = "Package boundary"
+status = "active"
+owner = "repo-infra"
+ledger_path = ".rails/policy/package-boundary.toml"
+notes = "Workspace package classification ledger."
+
+[[ledger]]
+id = "clippy-lints"
+name = "Clippy lint baseline"
+status = "active"
+owner = "repo-infra"
+ledger_path = ".rails/policy/clippy-lints.toml"
+notes = "Clippy lint policy baseline."
+
+[[ledger]]
+id = "clippy-exceptions"
+name = "Clippy exception receipts"
+status = "active"
+owner = "repo-infra"
+ledger_path = ".rails/policy/clippy-exceptions.toml"
+notes = "Durable clippy exception receipts."
+
+[[ledger]]
+id = "no-panic-allowlist"
+name = "Panic allowlist"
+status = "active"
+owner = "repo-infra"
+ledger_path = ".rails/policy/no-panic-allowlist.toml"
+notes = "Panic exception receipts."
+
+[[ledger]]
+id = "non-rust-allowlist"
+name = "Non-Rust file allowlist"
+status = "active"
+owner = "repo-infra"
+ledger_path = ".rails/policy/non-rust-allowlist.toml"
+notes = "Non-Rust file policy exceptions."

@@ -4,6 +4,8 @@
 
 `docs/` explains Rails to humans and contributors.
 
+For the full conceptual overview of the stack, see [docs/rails-overview.md](rails-overview.md).
+
 ## External namespaces (awareness-only)
 
 Rails does not own or mutate external tool/session state:

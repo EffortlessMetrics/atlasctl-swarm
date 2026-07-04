@@ -1,0 +1,3 @@
+schema_version = "1.0"
+
+# Non-Rust file policy exceptions.
