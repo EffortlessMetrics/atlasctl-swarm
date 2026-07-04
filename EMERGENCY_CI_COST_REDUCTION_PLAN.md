@@ -73,6 +73,10 @@ Audit all workflow files across repos and flag:
 - Artifacts only on failure unless release output.
 - Temporarily reduce CI Actuals fan-out to main/schedule/manual.
 
+## Long-Term Tooling Standard
+
+After the emergency cost controls are in place, use [`RUST_TOOLING_CONTROL_PLANE_STANDARD.md`](RUST_TOOLING_CONTROL_PLANE_STANDARD.md) as the durable Rust tooling contract: `xtask` is the public repo surface, upstream tools are the engine room, and heavyweight proof lanes are risk-routed rather than default PR tax.
+
 ## Definition of Done
 - No default PR `windows-latest` or `macos-latest`.
 - No default PR cross-platform matrix or release builds.
